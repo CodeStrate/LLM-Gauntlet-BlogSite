@@ -50,10 +50,91 @@ const remarkPlugins: PluggableList = [
 
 const rehypePlugins: PluggableList = [rehypeRaw]
 
+// Matches **ALL CAPS:** and **ALL CAPS (Role):** speaker labels used in screenplay-format episodes
+const SPEAKER_RE = /^[A-Z][A-Z0-9 .'.\-]+(?:\s*\([^)]+\))?:$/
+
 const components: Components = {
   h2(props) {
     const text = getTextContent(props.children)
     return <h2 id={slugify(text)} className="scroll-mt-32">{props.children}</h2>
+  },
+  p(props) {
+    const kids = React.Children.toArray(props.children)
+    const first = kids[0]
+
+    if (React.isValidElement(first) && (first as React.ReactElement).type === 'strong') {
+      const strongEl = first as React.ReactElement<{ children: React.ReactNode }>
+      const strongText = getTextContent(strongEl.props.children).trim()
+
+      // **[SCENE START]** / **[SCENE END]**
+      if (/^\[SCENE (?:START|END)\]$/.test(strongText)) {
+        return (
+          <div className="flex items-center gap-4 py-3">
+            <span className="flex-1 border-t border-[color:var(--color-rule)]" />
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--color-ink-faint)]">
+              {strongText.slice(1, -1)}
+            </span>
+            <span className="flex-1 border-t border-[color:var(--color-rule)]" />
+          </div>
+        )
+      }
+
+      // **SPEAKER NAME (Role):**
+      if (SPEAKER_RE.test(strongText)) {
+        const speakerName = strongText.slice(0, -1) // drop trailing ':'
+        const rest = kids.slice(1)
+
+        // skip leading <br> / empty strings
+        let i = 0
+        while (i < rest.length) {
+          const el = rest[i]
+          if (React.isValidElement(el) && (el as React.ReactElement).type === 'br') { i++; continue }
+          if (typeof el === 'string' && el.trim() === '') { i++; continue }
+          break
+        }
+
+        // optional stage direction: <em>(…)
+        let stageDirection: React.ReactNode = null
+        if (i < rest.length) {
+          const el = rest[i]
+          if (React.isValidElement(el) && (el as React.ReactElement).type === 'em') {
+            const emText = getTextContent((el as React.ReactElement<{ children: React.ReactNode }>).props.children)
+            if (emText.trim().startsWith('(')) {
+              stageDirection = el
+              i++
+              while (i < rest.length) {
+                const x = rest[i]
+                if (React.isValidElement(x) && (x as React.ReactElement).type === 'br') { i++; continue }
+                if (typeof x === 'string' && x.trim() === '') { i++; continue }
+                break
+              }
+            }
+          }
+        }
+
+        const dialogue = rest.slice(i)
+
+        return (
+          <div className="pl-4 border-l-2 border-[color:var(--color-rule)] space-y-1.5">
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] font-semibold text-[color:var(--color-ink-faint)]">
+              {speakerName}
+            </div>
+            {stageDirection && (
+              <div className="font-mono text-[11px] italic text-[color:var(--color-ink-faint)]">
+                {stageDirection}
+              </div>
+            )}
+            {dialogue.length > 0 && (
+              <p className="leading-relaxed m-0 text-[color:var(--color-ink)]">
+                {dialogue}
+              </p>
+            )}
+          </div>
+        )
+      }
+    }
+
+    return <p>{props.children}</p>
   },
   a(props) {
     const { href = '', children, ...rest } = props

@@ -38,17 +38,33 @@ export function DocReader() {
     )
   }, [rawBody])
 
-  // Strip leading H1 + lead blockquotes (we render our own header)
+  // Strip YAML frontmatter, leading H1, and lead blockquotes (if used for subtitle)
   const content = useMemo(() => {
-    let c = rawBody.replace(/^#\s+.+\n/, '')
-    c = c.replace(/^(>\s*.*\n)+/, '')
+    let c = rawBody.replace(/^---\r?\n[\s\S]*?\n---\r?\n/, '')
+    c = c.replace(/^\s+/, '')
+    c = c.replace(/^#\s+.+\r?\n/, '')
+
+    // Only strip the leading blockquote if we don't have a frontmatter description
+    // This preserves the full blockquote for docs that explicitly define a description
+    if (!doc?.hasFrontmatterDesc) {
+      c = c.replace(/^(>\s*.*\r?\n)+/, '')
+    }
+    
     return c
-  }, [rawBody])
+  }, [rawBody, doc?.hasFrontmatterDesc])
 
   const subtitle = useMemo(() => {
-    const m = rawBody.match(/^>\s*\*\*([^*]+)\*\*/m)
+    // If frontmatter description exists, use it (we store it in excerpt)
+    if (doc?.hasFrontmatterDesc) return doc.excerpt
+
+    // Otherwise fallback to finding a leading blockquote
+    let c = rawBody.replace(/^---\r?\n[\s\S]*?\n---\r?\n/, '')
+    c = c.replace(/^\s+/, '')
+    c = c.replace(/^#\s+.+\n/, '')
+    c = c.replace(/^\s+/, '')
+    const m = c.match(/^>\s*\*\*([^*]+)\*\*/m)
     return m ? m[1].trim() : ''
-  }, [rawBody])
+  }, [rawBody, doc?.hasFrontmatterDesc, doc?.excerpt])
 
   // Highlight the section currently in view
   useEffect(() => {

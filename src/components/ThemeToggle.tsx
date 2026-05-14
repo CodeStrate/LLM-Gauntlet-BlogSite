@@ -15,7 +15,6 @@ function resolvedTheme(theme: 'light' | 'dark' | 'system'): 'light' | 'dark' {
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
-  // Track resolved (rendered) theme so the icon flips when in 'system' mode and the OS pref changes.
   const [shown, setShown] = useState<'light' | 'dark'>(() => resolvedTheme(theme))
 
   useEffect(() => {

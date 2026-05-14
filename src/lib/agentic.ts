@@ -15,6 +15,7 @@ export type AgenticRow = {
 
 export type AgenticData = {
   harness: string
+  task?: string
   intro: string
   caveat: string
   rows: AgenticRow[]

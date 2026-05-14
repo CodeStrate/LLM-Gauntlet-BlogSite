@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import GauntletLogo from '../assets/gauntlet-logo.svg?react'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -14,6 +14,8 @@ type NavLink = {
   label: string
   /** Omit for plain links (no caret, no dropdown). */
   dropdown?: DropdownItem[]
+  /** Show a confirmation dialog before navigating. */
+  confirm?: boolean
 }
 
 const links: NavLink[] = [
@@ -38,14 +40,21 @@ const links: NavLink[] = [
     ],
   },
   // Plain links — no dropdown
-  { to: '/agentic', label: 'Agentic' },
+  { to: '/agentic', label: 'Agentic', confirm: true },
   { to: '/rubrics', label: 'Rubrics' },
   { to: '/leaderboard', label: 'Leaderboard' },
 ]
 
 export function Nav({ onOpenSearch }: { onOpenSearch: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [agenticDialogOpen, setAgenticDialogOpen] = useState(false)
+  const navigate = useNavigate()
   const location = useLocation()
+
+  function handleAgenticConfirm() {
+    setAgenticDialogOpen(false)
+    navigate('/agentic')
+  }
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -53,6 +62,10 @@ export function Nav({ onOpenSearch }: { onOpenSearch: () => void }) {
   }, [location.pathname, location.hash])
 
   return (
+    <>
+    {agenticDialogOpen && (
+      <AgenticDialog onConfirm={handleAgenticConfirm} onCancel={() => setAgenticDialogOpen(false)} />
+    )}
     <header className="sticky top-0 z-50 bg-[color:var(--color-bg)] border-b border-[color:var(--color-ink)]">
       <div className="max-w-none mx-auto px-4 sm:px-6 md:px-8 flex items-center gap-6 md:gap-12 min-h-[76px] md:min-h-[96px]">
         <Link to="/" className="flex items-center gap-2.5 sm:gap-3 shrink-0 group" aria-label="LLM Gauntlet — home">
@@ -67,7 +80,7 @@ export function Nav({ onOpenSearch }: { onOpenSearch: () => void }) {
 
         <nav className="font-mono font-regular hidden lg:flex flex-1 justify-center gap-[clamp(24px,3vw,88px)] h-[96px]">
           {links.map((link) => (
-            <NavItem key={link.to} link={link} />
+            <NavItem key={link.to} link={link} onConfirmClick={() => setAgenticDialogOpen(true)} />
           ))}
         </nav>
 
@@ -104,12 +117,21 @@ export function Nav({ onOpenSearch }: { onOpenSearch: () => void }) {
         <nav className="px-4 sm:px-6 py-4 flex flex-col gap-3" aria-label="Primary">
           {links.map(link => (
             <div key={link.to} className="flex flex-col gap-2">
-              <Link
-                to={link.to}
-                className="font-mono text-[13px] uppercase tracking-[0.12em] text-[color:var(--color-ink)]"
-              >
-                {link.label}
-              </Link>
+              {link.confirm ? (
+                <button
+                  onClick={() => { setMenuOpen(false); setAgenticDialogOpen(true) }}
+                  className="font-mono text-[13px] uppercase tracking-[0.12em] text-[color:var(--color-ink)] text-left"
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <Link
+                  to={link.to}
+                  className="font-mono text-[13px] uppercase tracking-[0.12em] text-[color:var(--color-ink)]"
+                >
+                  {link.label}
+                </Link>
+              )}
               {link.dropdown && (
                 <div className="pl-4 flex flex-col gap-2">
                   {link.dropdown.map(item => (
@@ -135,10 +157,11 @@ export function Nav({ onOpenSearch }: { onOpenSearch: () => void }) {
         </nav>
       </div>
     </header>
+    </>
   )
 }
 
-function NavItem({ link }: { link: NavLink }) {
+function NavItem({ link, onConfirmClick }: { link: NavLink; onConfirmClick: () => void }) {
   const location = useLocation()
   const isActive = location.pathname.startsWith(link.to)
   const [open, setOpen] = useState(false)
@@ -166,19 +189,19 @@ function NavItem({ link }: { link: NavLink }) {
 
   // Plain link — no dropdown machinery
   if (!hasDropdown) {
+    const cls = [
+      'font-mono text-[clamp(15px,1.45vw,21px)] tracking-[0.04em] uppercase font-medium px-1 h-full flex items-center transition-colors',
+      isActive
+        ? 'text-[color:var(--color-ink)] after:content-[""] after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:bg-[color:var(--color-ink)]'
+        : 'text-[color:var(--color-ink-soft)] hover:text-[color:var(--color-ink)]',
+    ].join(' ')
     return (
       <div className="relative flex items-center h-full">
-        <Link
-          to={link.to}
-          className={[
-            'font-mono text-[clamp(15px,1.45vw,21px)] tracking-[0.04em] uppercase font-medium px-1 h-full flex items-center transition-colors',
-            isActive
-              ? 'text-[color:var(--color-ink)] after:content-[""] after:absolute after:left-1 after:right-1 after:bottom-0 after:h-0.5 after:bg-[color:var(--color-ink)]'
-              : 'text-[color:var(--color-ink-soft)] hover:text-[color:var(--color-ink)]',
-          ].join(' ')}
-        >
-          {link.label}
-        </Link>
+        {link.confirm ? (
+          <button className={cls} onClick={onConfirmClick}>{link.label}</button>
+        ) : (
+          <Link to={link.to} className={cls}>{link.label}</Link>
+        )}
       </div>
     )
   }
@@ -267,6 +290,89 @@ function SearchIcon() {
       <circle cx="11" cy="11" r="7" />
       <line x1="21" y1="21" x2="16.65" y2="16.65" />
     </svg>
+  )
+}
+
+function AgenticDialog({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCancel()
+      if (e.key === 'y' || e.key === 'Y') onConfirm()
+      if (e.key === 'n' || e.key === 'N') onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onConfirm, onCancel])
+
+  return (
+    <div className="fixed inset-0 z-[400] flex items-center justify-center font-mono">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-[color:var(--color-bg)]/90 backdrop-blur-sm" onClick={onCancel} />
+
+      {/* Scanline overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 4px)',
+        }}
+      />
+
+      {/* Sweep line */}
+      <div
+        className="absolute inset-x-0 h-[80px] pointer-events-none opacity-[0.04]"
+        style={{
+          background: 'linear-gradient(to bottom, transparent, var(--color-ink) 50%, transparent)',
+          animation: 'agenticSweep 4s linear infinite',
+        }}
+      />
+
+      {/* Dialog box */}
+      <div
+        className="relative z-10 bg-[color:var(--color-bg)] border border-[color:var(--color-ink)] p-8 w-full max-w-[420px] mx-4 text-[color:var(--color-ink)]"
+        style={{ animation: 'agenticFlicker 0.35s ease-out forwards' }}
+      >
+        {/* Header bar */}
+        <div className="flex items-center justify-between mb-6 text-[10px] text-[color:var(--color-ink-faint)] tracking-[0.2em]">
+          <span>■ SYSTEM INTERRUPT</span>
+          <span>LLM-GAUNTLET/AGENTIC</span>
+        </div>
+
+        {/* Body */}
+        <div className="mb-6 space-y-3 text-[13px] leading-relaxed">
+          <div className="text-[color:var(--color-ink)] tracking-wide font-semibold">ENTERING AGENTIC MODE</div>
+          <div className="text-[color:var(--color-ink-soft)] text-[12px] leading-relaxed">
+            Replays of autonomous AI coding sessions.<br />
+            Experimental interface.
+          </div>
+        </div>
+
+        {/* Prompt line */}
+        <div className="flex items-center gap-1 mb-6 text-[13px] text-[color:var(--color-ink-soft)]">
+          <span>&gt; Proceed?</span>
+          <span
+            className="inline-block w-[8px] h-[14px] bg-[color:var(--color-ink)] ml-1"
+            style={{ animation: 'agenticBlink 1s step-end infinite' }}
+          />
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <button
+            autoFocus
+            onClick={onConfirm}
+            className="border border-[color:var(--color-ink)] text-[color:var(--color-ink)] px-5 py-1.5 text-[12px] tracking-[0.15em] hover:bg-[color:var(--color-ink)] hover:text-[color:var(--color-bg)] transition-colors duration-100"
+          >
+            [Y] ENTER
+          </button>
+          <button
+            onClick={onCancel}
+            className="border border-[color:var(--color-rule)] text-[color:var(--color-ink-faint)] px-5 py-1.5 text-[12px] tracking-[0.15em] hover:border-[color:var(--color-ink-soft)] hover:text-[color:var(--color-ink-soft)] transition-colors duration-100"
+          >
+            [N] CANCEL
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

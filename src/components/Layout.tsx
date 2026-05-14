@@ -26,7 +26,7 @@ export function Layout() {
       <main className="min-h-[calc(100svh-160px)]">
         <Outlet />
       </main>
-      <Footer />
+      {!location.pathname.startsWith('/agentic') && <Footer />}
       <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   )

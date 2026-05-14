@@ -34,6 +34,7 @@ export type Model = {
   summary: string
   scores: TaskScore[]
   badges?: string[]
+  reap?: boolean
 }
 
 export const models: Model[] = data as Model[]
@@ -92,6 +93,7 @@ export function benchedModels(): Model[] {
 }
 
 export function modelGroupKey(model: Model): string {
+  if (model.reap) return `reap-${model.slug}`
   const normalized = model.name
     .toLowerCase()
     .replace(/\b(no think|thinking|medium reasoning|low reasoning|high reasoning|tuned|stock|track b|retry)\b/g, '')
@@ -125,6 +127,7 @@ export function groupedModels(list: Model[] = models): ModelGroup[] {
 }
 
 function baseModelName(model: Model): string {
+  if (model.reap) return `${model.name} (REAP)`
   if (model.name.includes('GPT OSS')) return 'GPT OSS 20B'
   if (model.name.includes('Gemma')) return 'Gemma 4 E4B'
   if (model.name.includes('Devstral')) return 'Devstral Small'

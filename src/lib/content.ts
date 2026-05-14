@@ -15,6 +15,7 @@ export type DocType =
   | 'gauntlet'
   | 'welcome'
   | 'retest'
+  | 'agentic'
 
 export type Doc = {
   slug: string
@@ -25,7 +26,8 @@ export type Doc = {
   date?: string
   episodeNumber?: number
   excerpt: string
-  frontmatter?: Record<string, unknown>
+  hasFrontmatterDesc?: boolean
+  agenticTag?: 'episode' | 'deliberation' | 'report'
 }
 
 export const docs: Doc[] = manifest as Doc[]
@@ -54,12 +56,14 @@ export function docsByType(type: DocType): Doc[] {
 
 /** Recent items for the homepage — episodes first, then newest deliberations. */
 export function recentDocs(limit = 6): Doc[] {
-  const episodes = docsByType('episode').sort(
-    (a, b) => (a.episodeNumber ?? 99) - (b.episodeNumber ?? 99),
-  )
-  const delibs = docsByType('deliberation').slice()
-  const methodology = docsByType('methodology').slice(0, 2)
-  return [...delibs, ...methodology, ...episodes].slice(0, limit)
+  const allDocs = [...docsByType('episode'), ...docsByType('deliberation'), ...docsByType('methodology')]
+  return allDocs
+    .sort((a, b) => {
+      const dateA = a.date ? new Date(a.date).getTime() : 0
+      const dateB = b.date ? new Date(b.date).getTime() : 0
+      return dateB - dateA
+    })
+    .slice(0, limit)
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +87,7 @@ export function routeForDoc(doc: Doc): string {
   switch (doc.type) {
     case 'episode': return `/blog/${doc.slug}`
     case 'deliberation': return `/deliberations/${doc.slug}`
+    case 'agentic': return `/docs/${doc.slug}`
     case 'rubric': return `/rubrics`
     case 'retest': return `/deliberations/${doc.slug}`
     case 'welcome': return `/`

@@ -1,12 +1,50 @@
-import { existsSync } from 'node:fs'
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
-import { defineConfig, loadEnv } from 'vite'
+import { dirname, resolve, join } from 'node:path'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import svgr from 'vite-plugin-svgr'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+function devVaultWriter(): Plugin {
+  return {
+    name: 'dev-vault-writer',
+    configureServer(server) {
+      server.middlewares.use('/__dev/save', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method not allowed')
+          return
+        }
+        
+        let body = ''
+        req.on('data', chunk => { body += chunk })
+        req.on('end', () => {
+          try {
+            const { filename, content } = JSON.parse(body)
+            if (!filename || typeof content !== 'string') {
+              res.statusCode = 400
+              res.end(JSON.stringify({ error: 'filename and content required' }))
+              return
+            }
+            
+            const targetPath = join(__dirname, 'src/content/vault', filename)
+            mkdirSync(dirname(targetPath), { recursive: true })
+            writeFileSync(targetPath, content, 'utf8')
+            
+            res.statusCode = 200
+            res.end(JSON.stringify({ ok: true, path: targetPath }))
+          } catch (e) {
+            res.statusCode = 500
+            res.end(JSON.stringify({ error: String(e) }))
+          }
+        })
+      })
+    },
+  }
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -24,6 +62,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       svgr({ include: '**/*.svg?react' }),
+      ...(mode === 'development' ? [devVaultWriter()] : []),
     ],
     resolve: {
       alias: {

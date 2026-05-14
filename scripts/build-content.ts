@@ -4,21 +4,21 @@
  * Vault is the single source of truth. This script is the only bridge.
  * Run manually: `bun run content` (or `bun run scripts/build-content.ts`).
  */
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, cpSync, statSync } from 'node:fs'
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync, statSync } from 'node:fs'
 import { dirname, join, basename, relative } from 'node:path'
 import matter from 'gray-matter'
 import { config as dotenvConfig } from 'dotenv'
 
-// Load .env.local first (developer overrides), then .env. dotenv won't
-// overwrite already-set vars, so this gives the .local file priority while
-// still picking up shared defaults from .env.
 dotenvConfig({ path: '.env.local' })
 dotenvConfig()
 
-/** Recursively walk a directory, returning absolute paths to .md files. */
+const IGNORED_DIRS = ['plans', 'Stock Dump', 'Track A Chat Dumps', 'Track B Chat Dumps', 'REAP Chat Dumps']
+
 function walkMarkdown(dir: string): string[] {
   const out: string[] = []
   for (const entry of readdirSync(dir)) {
+    if (IGNORED_DIRS.includes(entry)) continue
+    
     const full = join(dir, entry)
     const s = statSync(full)
     if (s.isDirectory()) out.push(...walkMarkdown(full))
@@ -27,44 +27,42 @@ function walkMarkdown(dir: string): string[] {
   return out
 }
 
-// Source vault path — set via env so it never lives in version control.
-//   bun run content                     # uses VAULT_ROOT from .env / shell
-//   VAULT_ROOT=/path/to/vault bun run content
 const VAULT_ROOT = process.env.VAULT_ROOT ?? ''
 const OUT_DIR = join(process.cwd(), 'src/content/vault')
 const MANIFEST_PATH = join(process.cwd(), 'src/content/manifest.json')
 
-type DocType = 'episode' | 'deliberation' | 'rubric' | 'plan' | 'methodology' | 'gauntlet' | 'welcome' | 'retest' | 'other'
+type DocType = 'episode' | 'deliberation' | 'rubric' | 'plan' | 'methodology' | 'gauntlet' | 'welcome' | 'retest' | 'agentic' | 'other'
 
 type Doc = {
-  slug: string         // url-safe filename without extension
-  wikiKey: string      // basename without extension, preserves original case + underscores. The literal `[[...]]` target.
-  filename: string     // original filename
-  title: string        // frontmatter title > first H1 > filename
+  slug: string
+  wikiKey: string
+  filename: string
+  title: string
   type: DocType
-  date?: string        // frontmatter date > date parsed from filename
+  date?: string
   episodeNumber?: number
-  excerpt: string      // frontmatter description > first prose paragraph
-  frontmatter?: Record<string, unknown>
+  excerpt: string
+  hasFrontmatterDesc?: boolean
+  agenticTag?: 'episode' | 'deliberation' | 'report'
 }
 
 function classify(filename: string, relPath: string): DocType {
   const f = filename.toLowerCase()
   const dir = relPath.toLowerCase()
-  if (dir.includes('episode') || f.startsWith('episode-')) return 'episode'
+  if (dir.includes('agentic episodes') || dir.includes('agentic deliberations') || dir.includes('agentic reports')) return 'agentic'
+  if (dir.includes('episode') || f.startsWith('episode-') || f.startsWith('interlude-')) return 'episode'
   if (dir.includes('deliberation') || f.startsWith('deliberation-')) return 'deliberation'
   if (f === 'eval_rubric.md') return 'rubric'
-  // april-plan: deliberately excluded from the public site (internal scheduling doc)
   if (f === 'april-plan.md') return 'other'
   if (f === 'v2.1-gauntlet-methodology.md') return 'methodology'
   if (f === 'champion-gauntlet-plan.md') return 'gauntlet'
   if (f === 'welcome.md') return 'welcome'
   if (f === 'scores.md' || f === 'stock-vs-tuned-comparison.md') return 'methodology'
   if (f.includes('retest')) return 'retest'
+  if (f.includes('champion') || f.includes('gauntlet')) return 'gauntlet'
   return 'other'
 }
 
-/** Convert "deliberation-29.4.26" → "2026-04-29" (assumes 26 = 2026, DD.M.YY). */
 function dateFromFilename(filename: string): string | undefined {
   const m = filename.match(/(\d{1,2})\.(\d{1,2})\.(\d{2})/)
   if (!m) return
@@ -73,9 +71,39 @@ function dateFromFilename(filename: string): string | undefined {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
 }
 
+function getDefaultDate(type: DocType, episodeNumber?: number, title?: string): string | undefined {
+  if (type === 'episode' && episodeNumber !== undefined) {
+    // Interludes (100+)
+    if (episodeNumber === 101) return '2026-04-28T00:00:00.000Z' // Sushi coder
+    if (episodeNumber === 102) return '2026-05-01T00:00:00.000Z' // Sampling illusion
+    
+    // Episodes
+    if (episodeNumber === 1) return '2026-04-09T00:00:00.000Z'
+    if (episodeNumber === 2) return '2026-04-11T00:00:00.000Z'
+    if (episodeNumber === 3) return '2026-05-02T00:00:00.000Z' // Matches REAP Deep Dive
+    if (episodeNumber === 4) return '2026-05-03T00:00:00.000Z' // Follows episode 3
+    if (episodeNumber === 6) return '2026-05-05T00:00:00.000Z'
+    if (episodeNumber === 7) return '2026-05-06T00:00:00.000Z'
+    if (episodeNumber === 8) return '2026-05-07T00:00:00.000Z'
+  }
+  
+  if (type === 'rubric' || type === 'welcome') return '2026-04-01T00:00:00.000Z'
+  if (type === 'gauntlet') return '2026-05-01T00:00:00.000Z'
+  if (type === 'methodology') {
+    if (title && title.includes('Scores')) return '2026-04-27T00:00:00.000Z'
+    return '2026-04-15T00:00:00.000Z'
+  }
+  
+  return undefined
+}
+
 function episodeNumber(filename: string): number | undefined {
   const m = filename.match(/^episode-(\d+)/i)
-  return m ? parseInt(m[1], 10) : undefined
+  if (m) return parseInt(m[1], 10)
+  
+  const im = filename.match(/^interlude-(\d+)/i)
+  if (im) return parseInt(im[1], 10) + 100
+  return undefined
 }
 
 function slugify(filename: string): string {
@@ -88,35 +116,71 @@ function extractTitle(body: string, fallback: string): string {
 }
 
 function extractExcerpt(body: string): string {
-  // Strip leading title + frontmatter-ish blockquote tagline, find first prose paragraph
   const lines = body.split('\n')
   let i = 0
-  // Skip H1
   while (i < lines.length && !/^[a-z0-9_*-]/i.test(lines[i])) i++
-  // Skip blockquote tagline
   while (i < lines.length && lines[i].startsWith('>')) i++
-  // Skip blank
   while (i < lines.length && lines[i].trim() === '') i++
-  // Skip horizontal rules
   while (i < lines.length && /^---+$/.test(lines[i].trim())) i++
   while (i < lines.length && lines[i].trim() === '') i++
-  // First H2 + body? Or just plain prose? Take next non-heading paragraph.
+  // Skip screenplay scene markers, speaker labels, and stage directions
+  const SKIP_LINE = /^\*\*\[SCENE (?:START|END)\]\*\*$|^\*\*[A-Z][A-Z0-9 .'&\-]+(?:\s*\([^)]+\))?:\*\*$|^\*\([^)]/
+  while (i < lines.length && (lines[i].trim() === '' || SKIP_LINE.test(lines[i].trim()))) i++
   const para: string[] = []
   while (i < lines.length) {
     const l = lines[i]
     if (l.trim() === '') break
     if (/^#{1,6}\s/.test(l)) { i++; continue }
+    // Stop at next speaker label or scene marker
+    if (SKIP_LINE.test(l.trim())) break
     para.push(l)
     i++
   }
-  const txt = para.join(' ').replace(/\s+/g, ' ').trim()
+  const txt = para.join(' ').replace(/\*\*/g, '').replace(/\s+/g, ' ').trim()
   return txt.length > 280 ? txt.slice(0, 277) + '…' : txt
 }
 
+function formatForWeb(content: string, _filename: string): string {
+  let s = content
+  
+  // Convert Obsidian wikilinks to plain text (remark-wiki-link handles [[links]] at render time,
+  // but non-wikilink [[text]] in tables/post-credits needs resolving at build time too)
+  s = s.replace(/\[\[(.*?)\]\]/g, '$1')
+
+  // Fix double colons
+  s = s.replace(/:\s{2,}/g, ': ')
+  
+  // Ensure blank line before lists (critical for MD rendering)
+  s = s.replace(/([^\n])\n(\*   |\d+\. )/g, '$1\n\n$2')
+  
+  // Fix list continuation (sub-items should have blank line before)
+  s = s.replace(/(\*   [^\n]+)\n(\*   )/g, '$1\n$2')
+  
+  // Ensure headers have blank line before
+  s = s.replace(/([^\n])\n## /g, '$1\n\n## ')
+  s = s.replace(/([^\n])\n### /g, '$1\n\n### ')
+  
+  // Fix orphan list items after paragraphs without blank line
+  s = s.replace(/(\.[^\n]*)\n(\*   |\d+\. )/g, '$1\n\n$2')
+  
+  return s
+}
+
+const OVERWRITE = process.argv.includes('--overwrite')
+
 function main() {
+  if (!OVERWRITE && existsSync(OUT_DIR)) {
+    console.log('[build-content] Skipping - content exists. Use --overwrite to rebuild.')
+    return
+  }
+
+  if (OVERWRITE) {
+    rmSync(OUT_DIR, { recursive: true, force: true })
+  }
+  mkdirSync(OUT_DIR, { recursive: true })
+
   if (!VAULT_ROOT) {
     console.error('[build-content] VAULT_ROOT env var not set. Skipping.')
-    console.error('  Set it in .env.local or pass inline:  VAULT_ROOT=/path/to/vault bun run content')
     return
   }
   if (!existsSync(VAULT_ROOT)) {
@@ -124,9 +188,7 @@ function main() {
     return
   }
 
-  // Wipe + recreate output
-  rmSync(OUT_DIR, { recursive: true, force: true })
-  mkdirSync(OUT_DIR, { recursive: true })
+  if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true })
 
   const files = walkMarkdown(VAULT_ROOT)
   const docs: Doc[] = []
@@ -135,45 +197,68 @@ function main() {
     const filename = basename(fullPath)
     const relPath = relative(VAULT_ROOT, fullPath)
 
-    // Preserve the vault subtree so task runs with duplicate filenames do not overwrite each other.
-    const dst = join(OUT_DIR, relPath)
-    mkdirSync(dirname(dst), { recursive: true })
-    cpSync(fullPath, dst)
-
     const raw = readFileSync(fullPath, 'utf8')
     const type = classify(filename, relPath)
     if (type === 'other') continue
+    
+    let formatted = raw;
+    if (type === 'episode') {
+      formatted = formatForWeb(raw, filename);
+    }
 
-    // Pull frontmatter via gray-matter — Obsidian/Iceberg-style YAML at the head.
-    const { data: frontmatter, content: body } = matter(raw)
+    const dst = join(OUT_DIR, relPath)
+    if (existsSync(dst)) continue // preserve existing built content
+    mkdirSync(dirname(dst), { recursive: true })
+    writeFileSync(dst, formatted, 'utf8')
+
+    const { data: frontmatter, content: body } = matter(formatted)
 
     const slug = slugify(filename)
     const wikiKey = basename(filename, '.md')
+
+    let baseExcerpt = (frontmatter.description as string) || extractExcerpt(body)
+    baseExcerpt = baseExcerpt.replace(/\*\*/g, '')
+
+    let finalDate = (frontmatter.date as string) || dateFromFilename(filename)
+    const derivedTitle = (frontmatter.title as string) || extractTitle(body, wikiKey)
+    if (!finalDate) {
+      finalDate = getDefaultDate(type, (frontmatter.episode as number) || episodeNumber(filename), derivedTitle)
+    }
+
+    let agenticTag: 'episode' | 'deliberation' | 'report' | undefined
+    if (type === 'agentic') {
+      const lc = relPath.toLowerCase()
+      if (lc.includes('agentic episodes')) agenticTag = 'episode'
+      else if (lc.includes('agentic deliberations')) agenticTag = 'deliberation'
+      else agenticTag = 'report'
+    }
 
     docs.push({
       slug,
       wikiKey,
       filename: relPath,
-      title: (frontmatter.title as string) || extractTitle(body, wikiKey),
+      title: derivedTitle,
       type,
-      date: (frontmatter.date as string) || dateFromFilename(filename),
+      date: finalDate,
       episodeNumber: (frontmatter.episode as number) || episodeNumber(filename),
-      excerpt: (frontmatter.description as string) || extractExcerpt(body),
-      frontmatter: Object.keys(frontmatter).length > 0 ? frontmatter : undefined,
+      excerpt: baseExcerpt,
+      hasFrontmatterDesc: !!frontmatter.description,
+      agenticTag,
     })
   }
 
-  // Sort: episodes by number, deliberations newest first, others by title
   docs.sort((a, b) => {
+    const dateA = a.date ? new Date(a.date).getTime() : 0
+    const dateB = b.date ? new Date(b.date).getTime() : 0
+    if (dateA !== dateB) return dateB - dateA // descending (newest first)
+    if (a.type === 'episode' && b.type === 'episode') return (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0)
     if (a.type !== b.type) return a.type.localeCompare(b.type)
-    if (a.type === 'episode') return (a.episodeNumber ?? 0) - (b.episodeNumber ?? 0)
-    if (a.date && b.date) return b.date.localeCompare(a.date)
     return a.title.localeCompare(b.title)
   })
 
   mkdirSync(join(process.cwd(), 'src/content'), { recursive: true })
   writeFileSync(MANIFEST_PATH, JSON.stringify(docs, null, 2))
-  console.log(`[build-content] Copied ${files.length} files, indexed ${docs.length} docs to ${MANIFEST_PATH}`)
+  console.log(`[build-content] Processed ${files.length} files, indexed ${docs.length} docs to ${MANIFEST_PATH}`)
 }
 
 main()

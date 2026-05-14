@@ -57,6 +57,8 @@
   --backdrop-scrim: rgba(0, 0, 0, 0.7);
 }
 
+
+
 /* ---- base reset / globals ---- */
 :root {
   color: var(--color-ink);
@@ -78,6 +80,19 @@ a { text-decoration: none; }
 * { box-sizing: border-box; }
 
 img, svg, video, canvas { max-width: 100%; height: auto; }
+
+/* ---- block caret for agentic input (simulates opencode terminal cursor) ---- */
+.block-caret-input {
+  caret-color: transparent !important;
+  letter-spacing: 0;
+}
+.block-caret-cursor {
+  background: var(--a-accent, #b6a8ff);
+  color: var(--a-bg, #0e1014);
+}
+.block-caret-placeholder {
+  color: var(--a-ink-faint, #6f7585);
+}
 
 /* ---- the + plus pattern background under the hero (matches screenshot) ---- */
 .bg-cross-pattern {
@@ -245,6 +260,22 @@ img, svg, video, canvas { max-width: 100%; height: auto; }
 .prose-body li + li { margin-top: 10px; }
 .prose-body li > p:first-child { margin-top: 0; }
 .prose-body li p + p { margin-top: 8px; }
+
+@keyframes agenticFlicker {
+  0%   { opacity: 0; transform: scale(0.97); }
+  30%  { opacity: 1; }
+  50%  { opacity: 0.82; }
+  70%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes agenticBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+@keyframes agenticSweep {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(100%); }
+}
 
 /* drop-cap: first paragraph of an article gets a subtle large initial */
 .prose-body > p:first-of-type::first-letter {
