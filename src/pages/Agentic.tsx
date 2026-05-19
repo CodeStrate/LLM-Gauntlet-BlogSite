@@ -352,7 +352,7 @@ export function Agentic() {
     >
       {/* Fullscreen toggle */}
       <button
-        className={`absolute p-2 text-[var(--a-ink-faint)] hover:text-[var(--a-ink)] transition-colors z-[110] ${isFullscreen ? "top-4 right-4" : "top-3 right-4"}`}
+        className={`p-2 text-[var(--a-ink-faint)] hover:text-[var(--a-ink)] transition-colors z-[110] ${isFullscreen ? "absolute top-4 right-4" : "fixed top-[116px] right-4"}`}
         onClick={() => setIsFullscreen(!isFullscreen)}
         aria-label="Toggle Fullscreen"
       >
@@ -527,7 +527,7 @@ export function Agentic() {
       </div>
 
       {/* Status bar */}
-      <div className="absolute bottom-0 left-0 right-0 px-6 py-3 flex items-center justify-between text-[var(--a-ink-faint)] text-[12px] font-mono">
+      <div className="shrink-0 px-6 py-3 flex items-center justify-between text-[var(--a-ink-faint)] text-[12px] font-mono">
         <div className="flex items-center gap-4">
           <span>~/LLM-Gauntlet-Development:main</span>
           <div className="flex items-center gap-1.5">
@@ -535,7 +535,9 @@ export function Agentic() {
             <span>1 MCP /status</span>
           </div>
         </div>
-        <div>1.14.39</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--a-accent-green)]">●</span> Version 2
+        </div>
       </div>
     </div>
   );
