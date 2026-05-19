@@ -13,6 +13,7 @@ const SECTIONS: Array<{ id: Section; label: string; blurb: string }> = [
 ]
 
 const STORAGE_FEATURED = 'gauntlet:featuredSlug'
+const DEFAULT_FEATURED_SLUG = 'agentic-6-phase2-the-reranking-reckoning'
 
 function getFeaturedFromStorage(): string | null {
   if (typeof window === 'undefined') return null
@@ -24,7 +25,7 @@ function resolveFeaturedDoc(storedSlug: string | null, episodes: Doc[]): Doc | u
     const doc = docs.find(d => d.slug === storedSlug)
     if (doc) return doc
   }
-  return episodes[0]
+  return docs.find(d => d.slug === DEFAULT_FEATURED_SLUG) ?? episodes[0]
 }
 
 function formatSnappyTitle(title: string, doc: Doc): string {

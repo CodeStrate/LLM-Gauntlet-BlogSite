@@ -111,13 +111,12 @@ export function Leaderboard() {
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{
-              border: tab === t.id
-                ? '1.5px solid var(--color-ink)'
-                : '1.5px solid var(--color-ink)',
+              border: '1.5px solid var(--color-ink)',
               background: tab === t.id ? 'var(--color-ink)' : 'transparent',
               color: tab === t.id ? 'var(--color-bg)' : 'var(--color-ink-soft)',
+              padding: '7px 20px',
             }}
-            className="font-mono text-xs font-semibold tracking-wide rounded-full px-5 py-2 transition-colors hover:opacity-80"
+            className="font-mono text-xs font-semibold tracking-wide rounded-full transition-colors hover:opacity-80"
           >
             {t.label}
           </button>
