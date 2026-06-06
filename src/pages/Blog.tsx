@@ -29,7 +29,7 @@ function resolveFeaturedDoc(storedSlug: string | null, episodes: Doc[]): Doc | u
 }
 
 function formatSnappyTitle(title: string, doc: Doc): string {
-  let s = title.replace(/^LLM Arena V2\.\d+:\s*/i, '')
+  let s = title.replace(/^LLM Arena V\d+\.\d+:\s*/i, '')
   s = s.replace(/^Deliberation[:\s—]*/i, '')
 
   if (s.toLowerCase() === 'interlude' && doc.slug.includes('sushi')) return 'Interlude 1: Sushi Coder'

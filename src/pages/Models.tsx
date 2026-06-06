@@ -152,9 +152,16 @@ export function Models() {
                           {cardTitle(model)}
                         </h3>
                         {model.averageScore !== undefined && (
-                          <span className="font-headline text-2xl leading-none shrink-0">
-                            {model.averageScore.toFixed(2)}
-                          </span>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <span className="font-headline text-2xl leading-none">
+                              {model.averageScore.toFixed(2)}
+                            </span>
+                            {model.competitiveAverage !== undefined && (
+                              <span className="font-mono text-[10px] text-[color:var(--color-ink-faint)] leading-none">
+                                {model.competitiveAverage.toFixed(2)} comp
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                       {subtext && (

@@ -43,13 +43,14 @@ export function DocReader() {
     let c = rawBody.replace(/^---\r?\n[\s\S]*?\n---\r?\n/, '')
     c = c.replace(/^\s+/, '')
     c = c.replace(/^#\s+.+\r?\n/, '')
+    c = c.replace(/^\s+/, '') // strip whitespace/blank lines left after H1
 
     // Only strip the leading blockquote if we don't have a frontmatter description
     // This preserves the full blockquote for docs that explicitly define a description
     if (!doc?.hasFrontmatterDesc) {
       c = c.replace(/^(>\s*.*\r?\n)+/, '')
     }
-    
+
     return c
   }, [rawBody, doc?.hasFrontmatterDesc])
 
@@ -57,13 +58,16 @@ export function DocReader() {
     // If frontmatter description exists, use it (we store it in excerpt)
     if (doc?.hasFrontmatterDesc) return doc.excerpt
 
-    // Otherwise fallback to finding a leading blockquote
+    // Otherwise fallback to finding a leading blockquote — but skip metadata labels
     let c = rawBody.replace(/^---\r?\n[\s\S]*?\n---\r?\n/, '')
     c = c.replace(/^\s+/, '')
     c = c.replace(/^#\s+.+\n/, '')
     c = c.replace(/^\s+/, '')
     const m = c.match(/^>\s*\*\*([^*]+)\*\*/m)
-    return m ? m[1].trim() : ''
+    const candidate = m ? m[1].trim() : ''
+    // Reject metadata field labels (e.g. "Date:", "Lead:", "Re:", "Topic:")
+    if (/^(date|lead|re|topic|focus|panel|purpose|written by|scope|models?|featured model|task|season)\s*:?\s*$/i.test(candidate)) return ''
+    return candidate
   }, [rawBody, doc?.hasFrontmatterDesc, doc?.excerpt])
 
   // Highlight the section currently in view
@@ -102,7 +106,9 @@ export function DocReader() {
   const dateText = doc.date
     ? new Date(doc.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : ''
-  const titleClean = doc.title.replace(/^LLM Arena V2\.2:\s*/i, '').replace(/^LLM Arena V2\.1:\s*/i, '')
+  const titleClean = doc.title
+    .replace(/^LLM Arena V3\.0:\s*/i, '')
+    .replace(/^LLM Arena V2\.\d+:\s*/i, '')
 
   return (
     <article className="max-w-[1400px] mx-auto px-[clamp(16px,4vw,64px)] py-10 sm:py-12">

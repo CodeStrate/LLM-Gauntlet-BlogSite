@@ -215,8 +215,15 @@ function AverageCell({ model }: { model: Model }) {
     return <span className="text-[color:var(--color-ink-faint)]">—</span>
   }
   return (
-    <span className="font-mono text-[24px] font-bold leading-none tracking-[0.02em]">
-      {model.averageScore.toFixed(1)}
+    <span className="flex flex-col items-end gap-0.5">
+      <span className="font-mono text-[24px] font-bold leading-none tracking-[0.02em]">
+        {model.averageScore.toFixed(1)}
+      </span>
+      {model.competitiveAverage !== undefined && (
+        <span className="font-mono text-[11px] text-[color:var(--color-ink-faint)] leading-none">
+          {model.competitiveAverage.toFixed(1)} comp
+        </span>
+      )}
     </span>
   )
 }

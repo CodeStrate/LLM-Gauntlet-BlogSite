@@ -31,6 +31,7 @@ export type Model = {
   track: Track
   status: ModelStatus
   averageScore?: number
+  competitiveAverage?: number
   summary: string
   scores: TaskScore[]
   badges?: string[]

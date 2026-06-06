@@ -110,8 +110,18 @@ function Header({ model }: { model: Model }) {
             {model.averageScore.toFixed(2)}
           </div>
           <div className="font-mono text-[12px] uppercase tracking-widest text-[color:var(--color-ink-soft)] mt-3">
-            avg
+            casual avg
           </div>
+          {model.competitiveAverage !== undefined && (
+            <div className="mt-3 pt-3 border-t border-[color:var(--color-rule)]">
+              <div className="font-headline text-[clamp(28px,5vw,48px)] leading-none text-[color:var(--color-ink-soft)]">
+                {model.competitiveAverage.toFixed(2)}
+              </div>
+              <div className="font-mono text-[11px] uppercase tracking-widest text-[color:var(--color-ink-faint)] mt-1.5">
+                competitive avg
+              </div>
+            </div>
+          )}
         </div>
       )}
     </header>

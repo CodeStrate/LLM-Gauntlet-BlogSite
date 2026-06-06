@@ -53,7 +53,12 @@ const rehypePlugins: PluggableList = [rehypeRaw]
 // Matches **ALL CAPS:** and **ALL CAPS (Role):** speaker labels used in screenplay-format episodes
 const SPEAKER_RE = /^[A-Z][A-Z0-9 .'.\-]+(?:\s*\([^)]+\))?:$/
 
-const components: Components = {
+export function Prose({ children }: { children: string }) {
+  // Tracks the active speaker across consecutive paragraphs so continuation
+  // paragraphs (blank-line separated) inherit the same left-border attribution.
+  let lastSpeaker: string | null = null
+
+  const components: Components = {
   h2(props) {
     const text = getTextContent(props.children)
     return <h2 id={slugify(text)} className="scroll-mt-32">{props.children}</h2>
@@ -68,6 +73,7 @@ const components: Components = {
 
       // **[SCENE START]** / **[SCENE END]**
       if (/^\[SCENE (?:START|END)\]$/.test(strongText)) {
+        lastSpeaker = null
         return (
           <div className="flex items-center gap-4 py-3">
             <span className="flex-1 border-t border-[color:var(--color-rule)]" />
@@ -82,6 +88,7 @@ const components: Components = {
       // **SPEAKER NAME (Role):**
       if (SPEAKER_RE.test(strongText)) {
         const speakerName = strongText.slice(0, -1) // drop trailing ':'
+        lastSpeaker = speakerName
         const rest = kids.slice(1)
 
         // skip leading <br> / empty strings
@@ -134,6 +141,17 @@ const components: Components = {
       }
     }
 
+    // Continuation paragraph — same speaker, no label repeated
+    if (lastSpeaker !== null) {
+      return (
+        <div className="pl-4 border-l-2 border-[color:var(--color-rule)]">
+          <p className="leading-relaxed m-0 text-[color:var(--color-ink)]">
+            {props.children}
+          </p>
+        </div>
+      )
+    }
+
     return <p>{props.children}</p>
   },
   a(props) {
@@ -162,9 +180,8 @@ const components: Components = {
       </a>
     )
   },
-}
+  }
 
-export function Prose({ children }: { children: string }) {
   return (
     <div className="prose-body">
       <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
@@ -176,12 +193,22 @@ export function Prose({ children }: { children: string }) {
 
 /** Inline variant — for one-line markdown snippets that should not introduce a `<p>`. */
 export function ProseInline({ children }: { children: string }) {
+  const inlineComponents: Components = {
+    p: ({ children }) => <span>{children}</span>,
+    a(props) {
+      const { href = '', children, ...rest } = props
+      if (href.startsWith(WIKILINK_PREFIX)) {
+        const key = href.slice(WIKILINK_PREFIX.length)
+        const route = routeForWikiKey(key)
+        if (route) return <Link to={route}>{children}</Link>
+        return <span>{children}</span>
+      }
+      if (href.startsWith('/')) return <Link to={href}>{children}</Link>
+      return <a href={href} target="_blank" rel="noreferrer noopener" {...rest}>{children}</a>
+    },
+  }
   return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      rehypePlugins={rehypePlugins}
-      components={{ ...components, p: ({ children }) => <span>{children}</span> }}
-    >
+    <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={inlineComponents}>
       {children}
     </ReactMarkdown>
   )
